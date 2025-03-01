@@ -1,24 +1,34 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Flashcard from "../components/Flashcard";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft, BarChart3, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { getDeckById } from "../services/deckService";
+import { updateCardReviewStatus } from "../services/cardService";
+import { useAuth } from "../hooks/useAuth";
+import { rateDeck } from "../services/deckService";
 
 interface Card {
   id: string;
   question: string;
   answer: string;
-  category: string;
+  category: string | null;
   difficulty: "easy" | "medium" | "hard";
+  last_reviewed: string | null;
+  review_count: number;
 }
 
 const StudyPage = () => {
-  const { deckId } = useParams();
+  const { deckId } = useParams<{ deckId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stats, setStats] = useState({
     correct: 0,
@@ -27,52 +37,42 @@ const StudyPage = () => {
     total: 0,
     completed: false,
   });
+  const [userRating, setUserRating] = useState<number | null>(null);
 
-  // Mock data for the deck
-  const [deck, setDeck] = useState({
-    id: deckId,
-    title: "Biology 101",
-    description: "Introduction to cellular biology",
-    category: "Science",
-    cards: [
-      {
-        id: "1",
-        question: "What is the powerhouse of the cell?",
-        answer: "Mitochondria",
-        category: "Cell Biology",
-        difficulty: "easy" as const,
-      },
-      {
-        id: "2",
-        question: "What is the process by which plants convert light energy to chemical energy?",
-        answer: "Photosynthesis",
-        category: "Cell Biology",
-        difficulty: "medium" as const,
-      },
-      {
-        id: "3",
-        question: "What organelle is responsible for protein synthesis?",
-        answer: "Ribosome",
-        category: "Cell Biology",
-        difficulty: "hard" as const,
-      },
-      {
-        id: "4",
-        question: "What is the name of the semipermeable membrane that surrounds the cell?",
-        answer: "Cell membrane or plasma membrane",
-        category: "Cell Biology",
-        difficulty: "medium" as const,
-      },
-    ],
+  // Fetch deck data
+  const { data: deck, isLoading, error } = useQuery({
+    queryKey: ['deck', deckId],
+    queryFn: () => getDeckById(deckId || ''),
+    enabled: !!deckId,
+  });
+
+  // Update card review status
+  const updateCardMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string, status: 'correct' | 'incorrect' | 'hard' }) => 
+      updateCardReviewStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deck', deckId] });
+    },
+  });
+
+  // Submit deck rating
+  const ratingMutation = useMutation({
+    mutationFn: ({ rating }: { rating: number }) => 
+      rateDeck(user?.id || '', deckId || '', rating),
+    onSuccess: () => {
+      toast.success("Rating submitted!");
+      queryClient.invalidateQueries({ queryKey: ['deck', deckId] });
+    },
   });
 
   useEffect(() => {
-    // In a real app, this would fetch the deck data from a database
-    console.log(`Fetching deck with ID: ${deckId}`);
-    setStats({ ...stats, total: deck.cards.length });
-  }, [deckId]);
+    if (deck?.cards) {
+      setStats({ ...stats, total: deck.cards.length });
+    }
+  }, [deck]);
 
   const handleNextCard = () => {
+    if (!deck?.cards) return;
     if (currentIndex < deck.cards.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -89,15 +89,71 @@ const StudyPage = () => {
   };
 
   const handleMarkCard = (status: "correct" | "incorrect" | "hard") => {
-    // Update stats - Fix: Use type assertion to ensure we're accessing a numeric property
+    if (!deck?.cards) return;
+    
+    // Update stats
     setStats({
       ...stats,
-      [status]: (stats[status as keyof typeof stats] as number) + 1,
+      [status]: stats[status as keyof typeof stats] as number + 1,
     });
 
-    // In a real app, this would update the card's status in the database
-    console.log(`Card ${deck.cards[currentIndex].id} marked as ${status}`);
+    // Update card status in the database
+    updateCardMutation.mutate({
+      id: deck.cards[currentIndex].id,
+      status,
+    });
   };
+
+  const handleRateDeck = (rating: number) => {
+    setUserRating(rating);
+    ratingMutation.mutate({ rating });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error || !deck) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">Deck not found</h2>
+            <p className="text-muted-foreground mb-6">The deck you're looking for doesn't exist or you don't have permission to view it.</p>
+            <Link to="/decks" className="btn-primary">
+              Back to Decks
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!deck.cards || deck.cards.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 pt-24 pb-12 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">No cards in this deck</h2>
+            <p className="text-muted-foreground mb-6">This deck doesn't have any cards yet.</p>
+            <Link to="/decks" className="btn-primary">
+              Back to Decks
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const currentCard = deck.cards[currentIndex] as Card;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -142,6 +198,27 @@ const StudyPage = () => {
                   <div className="text-sm text-muted-foreground">Incorrect</div>
                 </div>
               </div>
+              
+              {/* Rating section */}
+              <div className="mb-6">
+                <p className="text-sm text-muted-foreground mb-2">How would you rate this deck?</p>
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      onClick={() => handleRateDeck(rating)}
+                      className={`p-2 rounded-full transition-colors ${
+                        userRating === rating 
+                          ? 'text-yellow-500' 
+                          : 'text-muted-foreground hover:text-yellow-500'
+                      }`}
+                    >
+                      <Star size={24} fill={userRating !== null && userRating >= rating ? "currentColor" : "none"} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
               <div className="flex gap-4 justify-center">
                 <Link to="/decks" className="btn-outline">
                   Back to Decks
@@ -156,6 +233,7 @@ const StudyPage = () => {
                       total: deck.cards.length,
                       completed: false,
                     });
+                    setUserRating(null);
                   }}
                   className="btn-primary"
                 >
@@ -165,10 +243,10 @@ const StudyPage = () => {
             </div>
           ) : (
             <Flashcard
-              question={deck.cards[currentIndex].question}
-              answer={deck.cards[currentIndex].answer}
-              category={deck.cards[currentIndex].category}
-              difficulty={deck.cards[currentIndex].difficulty}
+              question={currentCard.question}
+              answer={currentCard.answer}
+              category={currentCard.category || ""}
+              difficulty={currentCard.difficulty || "medium"}
               onNext={handleNextCard}
               onPrevious={handlePreviousCard}
               onMark={handleMarkCard}

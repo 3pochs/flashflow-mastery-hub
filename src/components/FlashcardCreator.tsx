@@ -1,38 +1,48 @@
 
 import { useState } from "react";
-import { Sparkles, Plus, Trash } from "lucide-react";
+import { Sparkles, Plus, Trash, Image, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
-import { saveDeck } from "../services/mockData";
-import { Card } from "../types";
 import { useNavigate } from "react-router-dom";
 import { generateFlashcardsWithAI } from "../services/ai";
+import { createDeck } from "../services/deckService";
+import { createCards } from "../services/cardService";
+import { useAuth } from "../hooks/useAuth";
+import { uploadCardMedia } from "../services/cardService";
 
 interface FlashcardData {
   question: string;
   answer: string;
+  media_url?: string;
+  category?: string;
+  difficulty?: "easy" | "medium" | "hard";
 }
 
 const FlashcardCreator = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
   const [deckName, setDeckName] = useState("");
   const [deckDescription, setDeckDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [cards, setCards] = useState<FlashcardData[]>([
-    { question: "", answer: "" },
-    { question: "", answer: "" },
+    { question: "", answer: "", difficulty: "medium" },
+    { question: "", answer: "", difficulty: "medium" },
   ]);
   const [bulkText, setBulkText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showBulkInput, setShowBulkInput] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState<number | null>(null);
 
-  const handleCardChange = (index: number, field: "question" | "answer", value: string) => {
+  const handleCardChange = (index: number, field: keyof FlashcardData, value: string) => {
     const newCards = [...cards];
-    newCards[index][field] = value;
+    newCards[index] = { ...newCards[index], [field]: value };
     setCards(newCards);
   };
 
   const addCard = () => {
-    setCards([...cards, { question: "", answer: "" }]);
+    setCards([...cards, { question: "", answer: "", difficulty: "medium" }]);
   };
 
   const removeCard = (index: number) => {
@@ -44,6 +54,39 @@ const FlashcardCreator = () => {
     const newCards = [...cards];
     newCards.splice(index, 1);
     setCards(newCards);
+  };
+
+  const handleMediaUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !user) return;
+    
+    const file = e.target.files[0];
+    const fileSize = file.size / 1024 / 1024; // in MB
+    
+    if (fileSize > 5) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+    
+    // Create a temporary deck ID for organizing uploads
+    const tempDeckId = "temp-" + Math.random().toString(36).substring(2, 11);
+    const tempCardId = "temp-" + Math.random().toString(36).substring(2, 11);
+    
+    setUploadingMedia(index);
+    
+    try {
+      const mediaUrl = await uploadCardMedia(file, tempDeckId, tempCardId);
+      if (mediaUrl) {
+        const newCards = [...cards];
+        newCards[index] = { ...newCards[index], media_url: mediaUrl };
+        setCards(newCards);
+        toast.success("Media uploaded successfully!");
+      }
+    } catch (error) {
+      console.error("Error uploading media:", error);
+      toast.error("Failed to upload media");
+    } finally {
+      setUploadingMedia(null);
+    }
   };
 
   const generateCards = async () => {
@@ -62,7 +105,8 @@ const FlashcardCreator = () => {
         // Convert the AI-generated cards to our FlashcardData format
         const formattedCards = generatedCards.map(card => ({
           question: card.question,
-          answer: card.answer
+          answer: card.answer,
+          difficulty: "medium" as "easy" | "medium" | "hard"
         }));
         
         setCards(formattedCards);
@@ -79,7 +123,12 @@ const FlashcardCreator = () => {
     }
   };
 
-  const handleSaveDeck = () => {
+  const handleSaveDeck = async () => {
+    if (!user) {
+      toast.error("You must be logged in to create a deck");
+      return;
+    }
+    
     // Validation
     if (!deckName.trim()) {
       toast.error("Please enter a deck name");
@@ -91,32 +140,47 @@ const FlashcardCreator = () => {
       return;
     }
     
-    // Format cards for saving
-    const cardsForSaving: Card[] = cards.map((card, index) => ({
-      id: (index + 1).toString(),
-      question: card.question,
-      answer: card.answer,
-      difficulty: "medium",
-    }));
+    setIsSubmitting(true);
     
-    // Save deck using our service
-    saveDeck({
-      id: "", // Will be assigned by the service
-      title: deckName,
-      description: deckDescription,
-      category,
-      cardsCount: cardsForSaving.length,
-      lastStudied: "Never",
-      progress: 0,
-      cards: cardsForSaving,
-    });
-    
-    toast.success("Deck saved successfully!");
-    
-    // Navigate to decks page
-    setTimeout(() => {
-      navigate("/decks");
-    }, 1500);
+    try {
+      // Create deck
+      const newDeck = await createDeck({
+        user_id: user.id,
+        title: deckName,
+        description: deckDescription,
+        category,
+        is_public: isPublic,
+      });
+      
+      if (!newDeck) {
+        throw new Error("Failed to create deck");
+      }
+      
+      // Format cards for saving
+      const cardsForSaving = cards.map(card => ({
+        deck_id: newDeck.id,
+        question: card.question,
+        answer: card.answer,
+        category: card.category || null,
+        difficulty: card.difficulty || "medium",
+        media_url: card.media_url,
+      }));
+      
+      // Save cards
+      await createCards(cardsForSaving);
+      
+      toast.success("Deck saved successfully!");
+      
+      // Navigate to decks page
+      setTimeout(() => {
+        navigate("/decks");
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving deck:", error);
+      toast.error("Failed to save deck");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -152,24 +216,43 @@ const FlashcardCreator = () => {
             />
           </div>
           
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium mb-1">
-              Category
-            </label>
-            <select
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="input-field w-full"
-            >
-              <option value="">Select a category</option>
-              <option value="science">Science</option>
-              <option value="math">Mathematics</option>
-              <option value="language">Language</option>
-              <option value="history">History</option>
-              <option value="arts">Arts</option>
-              <option value="other">Other</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium mb-1">
+                Category
+              </label>
+              <select
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="input-field w-full"
+              >
+                <option value="">Select a category</option>
+                <option value="Science">Science</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Language">Language</option>
+                <option value="History">History</option>
+                <option value="Arts">Arts</option>
+                <option value="Technology">Technology</option>
+                <option value="Business">Business</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center">
+              <label htmlFor="isPublic" className="flex items-center cursor-pointer">
+                <input
+                  id="isPublic"
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="mr-2 h-4 w-4"
+                />
+                <span className="text-sm font-medium">
+                  Make this deck public (visible to everyone)
+                </span>
+              </label>
+            </div>
           </div>
         </div>
         
@@ -257,6 +340,65 @@ const FlashcardCreator = () => {
                       placeholder="Enter the answer"
                     />
                   </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor={`difficulty-${index}`} className="block text-sm font-medium mb-1">
+                        Difficulty
+                      </label>
+                      <select
+                        id={`difficulty-${index}`}
+                        value={card.difficulty}
+                        onChange={(e) => handleCardChange(index, "difficulty", e.target.value as "easy" | "medium" | "hard")}
+                        className="input-field w-full"
+                      >
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor={`media-${index}`} className="block text-sm font-medium mb-1">
+                        Add Media (Optional)
+                      </label>
+                      <div className="relative">
+                        <input
+                          id={`media-${index}`}
+                          type="file"
+                          accept="image/*,audio/*"
+                          onChange={(e) => handleMediaUpload(index, e)}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor={`media-${index}`}
+                          className="btn-outline flex items-center justify-center gap-1 w-full cursor-pointer"
+                        >
+                          {uploadingMedia === index ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                          ) : card.media_url ? (
+                            <Image size={16} />
+                          ) : (
+                            <UploadCloud size={16} />
+                          )}
+                          {card.media_url ? "Change Media" : "Upload"}
+                        </label>
+                      </div>
+                      {card.media_url && (
+                        <div className="mt-2 flex justify-center">
+                          {card.media_url.endsWith('.mp3') || card.media_url.endsWith('.wav') ? (
+                            <audio src={card.media_url} controls className="w-full h-8" />
+                          ) : (
+                            <img 
+                              src={card.media_url} 
+                              alt="Card media" 
+                              className="h-16 object-contain rounded"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -274,9 +416,17 @@ const FlashcardCreator = () => {
           
           <button
             onClick={handleSaveDeck}
-            className="btn-primary flex-1"
+            className={`btn-primary flex-1 flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={isSubmitting}
           >
-            Save Deck
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                Saving...
+              </>
+            ) : (
+              "Save Deck"
+            )}
           </button>
         </div>
       </div>

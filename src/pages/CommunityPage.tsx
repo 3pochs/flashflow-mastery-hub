@@ -1,52 +1,56 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { Search, Filter, BookOpen, Users, Star, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Deck } from "../types";
-import { decks } from "../services/mockData";
+import { getDecks, rateDeck } from "../services/deckService";
+import { useAuth } from "../hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 
 const CommunityPage = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("popular");
+  const [category, setCategory] = useState("");
   
-  const communityDecks: Deck[] = [
-    ...decks,
-    {
-      id: "c1",
-      title: "Advanced JavaScript",
-      description: "ES6+ features and modern JS patterns",
-      cardsCount: 65,
-      category: "Programming",
-      lastStudied: "2 days ago",
-      progress: 45,
-    },
-    {
-      id: "c2",
-      title: "Human Anatomy",
-      description: "Comprehensive guide to human body systems",
-      cardsCount: 112,
-      category: "Medicine",
-      lastStudied: "1 week ago",
-      progress: 30,
-    },
-    {
-      id: "c3",
-      title: "Japanese Hiragana",
-      description: "Master the Japanese Hiragana writing system",
-      cardsCount: 46,
-      category: "Language",
-      lastStudied: "3 days ago",
-      progress: 72,
-    },
-  ];
+  // Fetch public decks
+  const { data: communityDecks = [], isLoading } = useQuery({
+    queryKey: ['communityDecks'],
+    queryFn: () => getDecks(),
+  });
   
   const filteredDecks = communityDecks.filter(deck => 
-    deck.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deck.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deck.category.toLowerCase().includes(searchQuery.toLowerCase())
+    (deck.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    deck.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    deck.category?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (category ? deck.category === category : true)
   );
+  
+  // Sort decks based on active tab
+  const sortedDecks = [...filteredDecks].sort((a, b) => {
+    if (activeTab === "popular") {
+      return (b.avg_rating || 0) - (a.avg_rating || 0);
+    } else if (activeTab === "recent") {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    return 0;
+  });
+  
+  // Get unique categories
+  const categories = Array.from(new Set(communityDecks.map(deck => deck.category).filter(Boolean)));
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 pt-24 flex items-center justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -75,10 +79,17 @@ const CommunityPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="btn-outline flex items-center gap-1">
-              <Filter size={16} />
-              Filter
-            </button>
+            
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="input-field sm:w-48"
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
           
           {/* Tabs */}
@@ -104,75 +115,80 @@ const CommunityPage = () => {
               >
                 Recently Added
               </button>
-              <button
-                className={`px-4 py-2 font-medium text-sm border-b-2 ${
-                  activeTab === "featured"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setActiveTab("featured")}
-              >
-                Featured
-              </button>
             </div>
           </div>
           
           {/* Community Decks */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {filteredDecks.map((deck) => (
-              <div
-                key={deck.id}
-                className="glass rounded-lg overflow-hidden card-shadow hover-scale"
-              >
-                <div className={`h-2 bg-gradient-to-r from-primary to-accent`}></div>
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-lg">{deck.title}</h3>
-                    <span className="text-xs px-2 py-1 bg-secondary rounded-full">
-                      {deck.category}
-                    </span>
+          {sortedDecks.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {sortedDecks.map((deck) => (
+                <div
+                  key={deck.deck_id}
+                  className="glass rounded-lg overflow-hidden card-shadow hover-scale"
+                >
+                  <div className={`h-2 bg-gradient-to-r from-primary to-accent`}></div>
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-lg">{deck.title}</h3>
+                      <span className="text-xs px-2 py-1 bg-secondary rounded-full">
+                        {deck.category || "Uncategorized"}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                      {deck.description || "No description"}
+                    </p>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground mb-4">
+                      <div className="flex items-center gap-1">
+                        <BookOpen size={14} />
+                        <span>{deck.cards_count} cards</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Users size={14} />
+                        <span>By {deck.creator_name || "Anonymous"}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star size={14} className="text-yellow-500" />
+                        <span>{deck.avg_rating ? deck.avg_rating.toFixed(1) : "N/A"}</span>
+                      </div>
+                    </div>
+                    <Link
+                      to={`/decks/${deck.deck_id}`}
+                      className="btn-outline w-full text-center flex items-center justify-center gap-1"
+                    >
+                      View Deck <ArrowRight size={14} />
+                    </Link>
                   </div>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                    {deck.description}
-                  </p>
-                  <div className="flex justify-between items-center text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <BookOpen size={14} />
-                      <span>{deck.cardsCount} cards</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users size={14} />
-                      <span>425 users</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star size={14} className="text-yellow-500" />
-                      <span>4.8</span>
-                    </div>
-                  </div>
-                  <Link
-                    to={`/decks/${deck.id}`}
-                    className="btn-outline w-full text-center flex items-center justify-center gap-1"
-                  >
-                    View Deck <ArrowRight size={14} />
-                  </Link>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-secondary/30 rounded-lg">
+              <p className="text-muted-foreground mb-4">No decks found matching your criteria.</p>
+              <button 
+                onClick={() => {
+                  setSearchQuery("");
+                  setCategory("");
+                }}
+                className="btn-primary"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
           
           {/* Study Group Promo */}
           <div className="glass rounded-lg overflow-hidden mb-8">
             <div className="bg-gradient-to-r from-primary to-accent p-8 text-white">
               <div className="max-w-3xl mx-auto text-center">
-                <h2 className="text-2xl font-bold mb-4">Join a Study Group</h2>
+                <h2 className="text-2xl font-bold mb-4">Create Your Own Deck</h2>
                 <p className="mb-6">
-                  Connect with fellow learners, share study materials, and stay motivated together.
+                  Share your knowledge with the community and help others learn.
                 </p>
                 <Link 
-                  to="/groups"
+                  to="/create"
                   className="bg-white text-primary px-6 py-2 rounded-md font-medium inline-block hover:bg-opacity-90 transition-colors"
                 >
-                  Find Groups
+                  Create Deck
                 </Link>
               </div>
             </div>
