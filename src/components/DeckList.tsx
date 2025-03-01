@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Search, Bookmark, Clock, BarChart } from "lucide-react";
+import { Search, Bookmark, Clock, BarChart, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface Deck {
