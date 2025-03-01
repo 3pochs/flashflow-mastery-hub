@@ -1,7 +1,9 @@
-
 import { useState } from "react";
 import { Sparkles, Plus, Trash } from "lucide-react";
 import { toast } from "sonner";
+import { saveDeck } from "../services/mockData";
+import { Card } from "../types";
+import { useNavigate } from "react-router-dom";
 
 interface FlashcardData {
   question: string;
@@ -9,6 +11,7 @@ interface FlashcardData {
 }
 
 const FlashcardCreator = () => {
+  const navigate = useNavigate();
   const [deckName, setDeckName] = useState("");
   const [deckDescription, setDeckDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -81,15 +84,32 @@ const FlashcardCreator = () => {
       return;
     }
     
-    // This would save to a database in a real app
+    // Format cards for saving
+    const cardsForSaving: Card[] = cards.map((card, index) => ({
+      id: (index + 1).toString(),
+      question: card.question,
+      answer: card.answer,
+      difficulty: "medium",
+    }));
+    
+    // Save deck using our service
+    saveDeck({
+      id: "", // Will be assigned by the service
+      title: deckName,
+      description: deckDescription,
+      category,
+      cardsCount: cardsForSaving.length,
+      lastStudied: "Never",
+      progress: 0,
+      cards: cardsForSaving,
+    });
+    
     toast.success("Deck saved successfully!");
     
-    // Reset form
-    setDeckName("");
-    setDeckDescription("");
-    setCategory("");
-    setCards([{ question: "", answer: "" }]);
-    setBulkText("");
+    // Navigate to decks page
+    setTimeout(() => {
+      navigate("/decks");
+    }, 1500);
   };
 
   return (

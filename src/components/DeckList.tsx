@@ -1,67 +1,50 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Bookmark, Clock, BarChart, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
-
-interface Deck {
-  id: string;
-  title: string;
-  description: string;
-  cardsCount: number;
-  category: string;
-  lastStudied: string;
-  progress: number;
-}
+import { getDecks } from "../services/mockData";
+import { Deck } from "../types";
+import { toast } from "sonner";
 
 const DeckList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   
-  // Mock data
-  const decks: Deck[] = [
-    {
-      id: "1",
-      title: "Biology 101",
-      description: "Introduction to cellular biology",
-      cardsCount: 48,
-      category: "Science",
-      lastStudied: "Today",
-      progress: 68,
-    },
-    {
-      id: "2",
-      title: "Spanish Vocabulary",
-      description: "Common phrases and words",
-      cardsCount: 120,
-      category: "Language",
-      lastStudied: "Yesterday",
-      progress: 42,
-    },
-    {
-      id: "3",
-      title: "World History",
-      description: "Major events of the 20th century",
-      cardsCount: 75,
-      category: "History",
-      lastStudied: "3 days ago",
-      progress: 25,
-    },
-    {
-      id: "4",
-      title: "Physics Fundamentals",
-      description: "Classical mechanics and thermodynamics",
-      cardsCount: 60,
-      category: "Science",
-      lastStudied: "1 week ago",
-      progress: 15,
-    },
-  ];
+  useEffect(() => {
+    // In a real app, this would fetch decks from an API
+    setDecks(getDecks());
+  }, []);
   
-  const filteredDecks = decks.filter(deck => 
-    deck.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deck.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deck.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const toggleFavorite = (deckId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    if (favorites.includes(deckId)) {
+      setFavorites(favorites.filter(id => id !== deckId));
+      toast.success("Removed from favorites");
+    } else {
+      setFavorites([...favorites, deckId]);
+      toast.success("Added to favorites");
+    }
+  };
+  
+  // Filter decks based on search query and active filter
+  const filteredDecks = decks.filter(deck => {
+    // Apply search filter
+    const matchesSearch = 
+      deck.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      deck.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      deck.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Apply tab filter
+    if (activeFilter === "all") return matchesSearch;
+    if (activeFilter === "recent") return matchesSearch && deck.lastStudied === "Today" || deck.lastStudied === "Yesterday";
+    if (activeFilter === "favorites") return matchesSearch && favorites.includes(deck.id);
+    if (activeFilter === "complete") return matchesSearch && deck.progress === 100;
+    
+    return matchesSearch;
+  });
   
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -131,13 +114,10 @@ const DeckList = () => {
                     </span>
                   </div>
                   <button 
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      // Toggle favorite logic would go here
-                    }}
+                    className={`transition-colors ${favorites.includes(deck.id) ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
+                    onClick={(e) => toggleFavorite(deck.id, e)}
                   >
-                    <Bookmark size={16} />
+                    <Bookmark size={16} fill={favorites.includes(deck.id) ? "currentColor" : "none"} />
                   </button>
                 </div>
                 
@@ -176,7 +156,7 @@ const DeckList = () => {
                   className="px-3 py-1 rounded bg-primary text-white text-sm"
                   onClick={(e) => {
                     e.preventDefault();
-                    // Navigate to study page for this deck
+                    window.location.href = `/decks/${deck.id}/study`;
                   }}
                 >
                   Study
