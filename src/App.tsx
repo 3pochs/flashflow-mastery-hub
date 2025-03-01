@@ -16,6 +16,7 @@ import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import CommunityPage from "./pages/CommunityPage";
 import ProfilePage from "./pages/ProfilePage";
+import FriendsPage from "./pages/FriendsPage";
 import PrivateRoute from "./components/PrivateRoute";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/create" element={<PrivateRoute><CreatePage /></PrivateRoute>} />
             <Route path="/decks/:deckId" element={<PrivateRoute><StudyPage /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+            <Route path="/friends" element={<PrivateRoute><FriendsPage /></PrivateRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
