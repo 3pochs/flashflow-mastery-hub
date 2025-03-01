@@ -4,7 +4,7 @@ import Navbar from "../components/Navbar";
 import Hero from "../components/Hero";
 import Features from "../components/Features";
 import Footer from "../components/Footer";
-import { ArrowRight, Brain, BarChart3, Layers } from "lucide-react";
+import { ArrowRight, Brain, BarChart3, Layers, Users, MessageSquare, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useIntersectionObserver } from "../utils/animations";
 
@@ -51,7 +51,7 @@ const Index = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="text-center p-6 animate-on-scroll">
+              <div className="text-center p-6 animate-on-scroll hover-scale">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Brain className="h-8 w-8 text-primary" />
                 </div>
@@ -61,7 +61,7 @@ const Index = () => {
                 </p>
               </div>
               
-              <div className="text-center p-6 animate-on-scroll">
+              <div className="text-center p-6 animate-on-scroll hover-scale">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Layers className="h-8 w-8 text-primary" />
                 </div>
@@ -71,7 +71,7 @@ const Index = () => {
                 </p>
               </div>
               
-              <div className="text-center p-6 animate-on-scroll">
+              <div className="text-center p-6 animate-on-scroll hover-scale">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                   <BarChart3 className="h-8 w-8 text-primary" />
                 </div>
@@ -84,7 +84,57 @@ const Index = () => {
             
             <div className="text-center animate-on-scroll">
               <Link to="/demo" className="btn-outline text-base py-3 px-8 inline-flex items-center gap-2">
-                See It In Action <ArrowRight size={16} />
+                See How It Works <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Community Section */}
+        <section className="py-20 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
+          <div className="container px-4 mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-16 animate-on-scroll">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Join Our Learning Community</h2>
+              <p className="text-muted-foreground text-lg">
+                Connect with fellow learners, share decks, and ace your subjects together.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+              <div className="glass p-6 rounded-lg card-shadow text-center animate-on-scroll hover-scale">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Study Groups</h3>
+                <p className="text-muted-foreground">
+                  Create or join study groups for focused learning with people sharing similar goals.
+                </p>
+              </div>
+              
+              <div className="glass p-6 rounded-lg card-shadow text-center animate-on-scroll hover-scale">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <MessageSquare className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Community Forums</h3>
+                <p className="text-muted-foreground">
+                  Ask questions, share insights, and help others in our active learning forums.
+                </p>
+              </div>
+              
+              <div className="glass p-6 rounded-lg card-shadow text-center animate-on-scroll hover-scale">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Star className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Shared Decks</h3>
+                <p className="text-muted-foreground">
+                  Discover and use high-quality flashcard decks created and vetted by our community.
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-center animate-on-scroll">
+              <Link to="/community" className="btn-outline text-base py-3 px-8 inline-flex items-center gap-2">
+                Explore Community <ArrowRight size={16} />
               </Link>
             </div>
           </div>
@@ -104,7 +154,7 @@ const Index = () => {
               {testimonials.map((testimonial, index) => (
                 <div 
                   key={index} 
-                  className="glass p-6 rounded-lg card-shadow animate-on-scroll"
+                  className="glass p-6 rounded-lg card-shadow animate-on-scroll hover-scale"
                 >
                   <div className="flex mb-4">
                     {[...Array(5)].map((_, i) => (

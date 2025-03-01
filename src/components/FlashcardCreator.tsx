@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import { Sparkles, Plus, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { saveDeck } from "../services/mockData";
 import { Card } from "../types";
 import { useNavigate } from "react-router-dom";
+import { generateFlashcardsWithAI } from "../services/ai";
 
 interface FlashcardData {
   question: string;
@@ -44,32 +46,37 @@ const FlashcardCreator = () => {
     setCards(newCards);
   };
 
-  const generateCards = () => {
-    // This would normally call an AI API
+  const generateCards = async () => {
+    if (!bulkText.trim()) {
+      toast.error("Please enter some text to generate flashcards");
+      return;
+    }
+    
     setIsGenerating(true);
     
-    setTimeout(() => {
-      // Simulate AI-generated cards
-      const newCards = [
-        { 
-          question: "What is the capital of France?", 
-          answer: "Paris" 
-        },
-        { 
-          question: "Who painted the Mona Lisa?", 
-          answer: "Leonardo da Vinci" 
-        },
-        { 
-          question: "What is the largest planet in our solar system?", 
-          answer: "Jupiter" 
-        },
-      ];
+    try {
+      // Use the Gemini API to generate flashcards
+      const generatedCards = await generateFlashcardsWithAI(bulkText);
       
-      setCards(newCards);
+      if (generatedCards.length > 0) {
+        // Convert the AI-generated cards to our FlashcardData format
+        const formattedCards = generatedCards.map(card => ({
+          question: card.question,
+          answer: card.answer
+        }));
+        
+        setCards(formattedCards);
+        setShowBulkInput(false);
+        toast.success(`Generated ${generatedCards.length} flashcards from your text!`);
+      } else {
+        toast.error("Failed to generate flashcards. Please try again with different text.");
+      }
+    } catch (error) {
+      console.error("Error generating cards:", error);
+      toast.error("Something went wrong while generating flashcards.");
+    } finally {
       setIsGenerating(false);
-      setShowBulkInput(false);
-      toast.success("Generated 3 flashcards from your text!");
-    }, 1500);
+    }
   };
 
   const handleSaveDeck = () => {

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 const Hero = () => {
   return (
-    <section className="pt-36 pb-24 md:pt-48 md:pb-32">
+    <section className="pt-36 pb-24 md:pt-48 md:pb-32 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
       <div className="container px-4 mx-auto">
         <div className="opacity-0 animate-fade-in">
           <div className="max-w-3xl mx-auto text-center mb-12">
