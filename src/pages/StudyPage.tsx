@@ -89,10 +89,10 @@ const StudyPage = () => {
   };
 
   const handleMarkCard = (status: "correct" | "incorrect" | "hard") => {
-    // Update stats
+    // Update stats - Fix: Use type assertion to ensure we're accessing a numeric property
     setStats({
       ...stats,
-      [status]: stats[status as keyof typeof stats] + 1,
+      [status]: (stats[status as keyof typeof stats] as number) + 1,
     });
 
     // In a real app, this would update the card's status in the database
