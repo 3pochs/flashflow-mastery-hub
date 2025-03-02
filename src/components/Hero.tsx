@@ -1,8 +1,11 @@
 
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 const Hero = () => {
+  const { user } = useAuth();
+  
   return (
     <section className="pt-36 pb-24 md:pt-48 md:pb-32 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
       <div className="container px-4 mx-auto">
@@ -23,9 +26,11 @@ const Hero = () => {
               learn faster and remember longer.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/signup" className="btn-primary text-base py-3 px-8">
-                Get Started for Free
-              </Link>
+              {!user && (
+                <Link to="/signup" className="btn-primary text-base py-3 px-8">
+                  Get Started for Free
+                </Link>
+              )}
               <Link to="/demo" className="btn-outline text-base py-3 px-8 flex items-center gap-2">
                 See How It Works <ArrowRight size={16} />
               </Link>
