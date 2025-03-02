@@ -1,11 +1,13 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Settings } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,21 +39,41 @@ const Navbar = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-8">
-          <Link to="/decks" className="text-sm font-medium hover:text-primary transition-colors">
-            My Decks
-          </Link>
-          <Link to="/create" className="text-sm font-medium hover:text-primary transition-colors">
-            Create
-          </Link>
-          <Link to="/community" className="text-sm font-medium hover:text-primary transition-colors">
-            Community
-          </Link>
-          <Link 
-            to="/signup" 
-            className="btn-primary"
-          >
-            Get Started
-          </Link>
+          {user ? (
+            <>
+              <Link to="/decks" className="text-sm font-medium hover:text-primary transition-colors">
+                My Decks
+              </Link>
+              <Link to="/create" className="text-sm font-medium hover:text-primary transition-colors">
+                Create
+              </Link>
+              <Link to="/community" className="text-sm font-medium hover:text-primary transition-colors">
+                Community
+              </Link>
+              <Link to="/settings" className="text-sm font-medium hover:text-primary transition-colors">
+                <Settings size={18} className="inline mr-1" />
+                Settings
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to="/decks" className="text-sm font-medium hover:text-primary transition-colors">
+                My Decks
+              </Link>
+              <Link to="/create" className="text-sm font-medium hover:text-primary transition-colors">
+                Create
+              </Link>
+              <Link to="/community" className="text-sm font-medium hover:text-primary transition-colors">
+                Community
+              </Link>
+              <Link 
+                to="/signup" 
+                className="btn-primary"
+              >
+                Get Started
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Mobile Menu Button */}
@@ -88,13 +110,24 @@ const Navbar = () => {
             >
               Community
             </Link>
-            <Link 
-              to="/signup" 
-              className="mx-4 btn-primary text-center"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Get Started
-            </Link>
+            
+            {user ? (
+              <Link 
+                to="/settings" 
+                className="px-4 py-2 text-sm font-medium hover:text-primary transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Settings size={16} className="inline mr-1" /> Settings
+              </Link>
+            ) : (
+              <Link 
+                to="/signup" 
+                className="mx-4 btn-primary text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Get Started
+              </Link>
+            )}
           </nav>
         </div>
       )}

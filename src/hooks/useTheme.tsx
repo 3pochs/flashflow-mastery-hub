@@ -7,6 +7,7 @@ type ThemeContextType = {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   isDarkMode: boolean;
+  toggleDarkMode: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -18,6 +19,18 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const isDarkMode = theme === "dark" || theme === "green-dark";
+
+  const toggleDarkMode = () => {
+    if (theme === "light") {
+      setTheme("dark");
+    } else if (theme === "dark") {
+      setTheme("light");
+    } else if (theme === "green-light") {
+      setTheme("green-dark");
+    } else if (theme === "green-dark") {
+      setTheme("green-light");
+    }
+  };
 
   useEffect(() => {
     // Update localStorage
@@ -42,7 +55,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, isDarkMode }}>
+    <ThemeContext.Provider value={{ theme, setTheme, isDarkMode, toggleDarkMode }}>
       {children}
     </ThemeContext.Provider>
   );
