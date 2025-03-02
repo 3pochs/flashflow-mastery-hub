@@ -5,23 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Flashcard from "../components/Flashcard";
-import { ArrowLeft, BarChart3, Star } from "lucide-react";
+import { ArrowLeft, BarChart3, Star, RefreshCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { getDeckById } from "../services/deckService";
 import { updateCardReviewStatus } from "../services/cardService";
 import { useAuth } from "../hooks/useAuth";
 import { rateDeck } from "../services/deckService";
-
-interface Card {
-  id: string;
-  question: string;
-  answer: string;
-  category: string | null;
-  difficulty: "easy" | "medium" | "hard";
-  last_reviewed: string | null;
-  review_count: number;
-}
+import { Card } from "../types";
 
 const StudyPage = () => {
   const { deckId } = useParams<{ deckId: string }>();
@@ -38,6 +29,8 @@ const StudyPage = () => {
     completed: false,
   });
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [difficultCards, setDifficultCards] = useState<Card[]>([]);
+  const [studyingDifficultCards, setStudyingDifficultCards] = useState(false);
 
   // Fetch deck data
   const { data: deck, isLoading, error } = useQuery({
@@ -73,7 +66,10 @@ const StudyPage = () => {
 
   const handleNextCard = () => {
     if (!deck?.cards) return;
-    if (currentIndex < deck.cards.length - 1) {
+    
+    const cardsToStudy = studyingDifficultCards ? difficultCards : deck.cards;
+    
+    if (currentIndex < cardsToStudy.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       // End of deck
@@ -91,15 +87,25 @@ const StudyPage = () => {
   const handleMarkCard = (status: "correct" | "incorrect" | "hard") => {
     if (!deck?.cards) return;
     
+    const cardsToStudy = studyingDifficultCards ? difficultCards : deck.cards;
+    const currentCard = cardsToStudy[currentIndex];
+    
     // Update stats
     setStats({
       ...stats,
       [status]: stats[status as keyof typeof stats] as number + 1,
     });
 
+    // If card is marked as hard or incorrect, add it to difficult cards
+    if (status === "hard" || status === "incorrect") {
+      if (!difficultCards.some(card => card.id === currentCard.id)) {
+        setDifficultCards([...difficultCards, currentCard]);
+      }
+    }
+
     // Update card status in the database
     updateCardMutation.mutate({
-      id: deck.cards[currentIndex].id,
+      id: currentCard.id,
       status,
     });
   };
@@ -107,6 +113,35 @@ const StudyPage = () => {
   const handleRateDeck = (rating: number) => {
     setUserRating(rating);
     ratingMutation.mutate({ rating });
+  };
+
+  const handleStudyDifficultCards = () => {
+    if (difficultCards.length > 0) {
+      setCurrentIndex(0);
+      setStudyingDifficultCards(true);
+      setStats({
+        correct: 0,
+        incorrect: 0,
+        hard: 0,
+        total: difficultCards.length,
+        completed: false,
+      });
+    } else {
+      toast.info("No difficult cards to study!");
+    }
+  };
+
+  const handleRestartDeck = () => {
+    setCurrentIndex(0);
+    setStudyingDifficultCards(false);
+    setStats({
+      correct: 0,
+      incorrect: 0,
+      hard: 0,
+      total: deck?.cards?.length || 0,
+      completed: false,
+    });
+    setUserRating(null);
   };
 
   if (isLoading) {
@@ -153,7 +188,8 @@ const StudyPage = () => {
     );
   }
 
-  const currentCard = deck.cards[currentIndex] as Card;
+  const cardsToStudy = studyingDifficultCards ? difficultCards : deck.cards;
+  const currentCard = cardsToStudy[currentIndex] as Card;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -174,7 +210,10 @@ const StudyPage = () => {
             
             <div className="text-sm">
               <span className="font-medium">{currentIndex + 1}</span> of{" "}
-              <span className="font-medium">{deck.cards.length}</span> cards
+              <span className="font-medium">{cardsToStudy.length}</span> cards
+              {studyingDifficultCards && (
+                <span className="ml-2 text-xs text-primary">(Difficult Cards)</span>
+              )}
             </div>
           </div>
           
@@ -219,26 +258,25 @@ const StudyPage = () => {
                 </div>
               </div>
               
-              <div className="flex gap-4 justify-center">
+              <div className="flex flex-wrap gap-4 justify-center">
                 <Link to="/decks" className="btn-outline">
                   Back to Decks
                 </Link>
                 <button 
-                  onClick={() => {
-                    setCurrentIndex(0);
-                    setStats({
-                      correct: 0,
-                      incorrect: 0,
-                      hard: 0,
-                      total: deck.cards.length,
-                      completed: false,
-                    });
-                    setUserRating(null);
-                  }}
+                  onClick={handleRestartDeck}
                   className="btn-primary"
                 >
                   Study Again
                 </button>
+                {difficultCards.length > 0 && (
+                  <button 
+                    onClick={handleStudyDifficultCards}
+                    className="flex items-center gap-2 px-4 py-2 rounded-md bg-orange-100 text-orange-800 hover:bg-orange-200 transition-colors"
+                  >
+                    <RefreshCcw size={16} />
+                    Review Difficult Cards ({difficultCards.length})
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -247,6 +285,7 @@ const StudyPage = () => {
               answer={currentCard.answer}
               category={currentCard.category || ""}
               difficulty={currentCard.difficulty || "medium"}
+              mediaUrl={currentCard.media_url}
               onNext={handleNextCard}
               onPrevious={handlePreviousCard}
               onMark={handleMarkCard}

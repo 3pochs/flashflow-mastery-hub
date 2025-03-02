@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { Search, Filter, BookOpen, Users, Star, ArrowRight } from "lucide-react";
+import { Search, Filter, BookOpen, Users, Star, ArrowRight, TrendingUp, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getDecks, rateDeck } from "../services/deckService";
 import { useAuth } from "../hooks/useAuth";
@@ -13,6 +13,7 @@ const CommunityPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("popular");
   const [category, setCategory] = useState("");
+  const [rating, setRating] = useState("");
   
   // Fetch public decks
   const { data: communityDecks = [], isLoading } = useQuery({
@@ -24,13 +25,22 @@ const CommunityPage = () => {
     (deck.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     deck.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     deck.category?.toLowerCase().includes(searchQuery.toLowerCase())) &&
-    (category ? deck.category === category : true)
+    (category ? deck.category === category : true) &&
+    (rating ? 
+      (rating === "5" && deck.avg_rating >= 5) ||
+      (rating === "4" && deck.avg_rating >= 4 && deck.avg_rating < 5) ||
+      (rating === "3" && deck.avg_rating >= 3 && deck.avg_rating < 4) ||
+      (rating === "below3" && deck.avg_rating < 3)
+    : true)
   );
   
   // Sort decks based on active tab
   const sortedDecks = [...filteredDecks].sort((a, b) => {
     if (activeTab === "popular") {
       return (b.avg_rating || 0) - (a.avg_rating || 0);
+    } else if (activeTab === "trending") {
+      // Using ratings count as a proxy for trending
+      return (b.ratings_count || 0) - (a.ratings_count || 0);
     } else if (activeTab === "recent") {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     }
@@ -80,16 +90,32 @@ const CommunityPage = () => {
               />
             </div>
             
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="input-field sm:w-48"
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="input-field sm:w-48"
+                aria-label="Filter by category"
+              >
+                <option value="">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              <select
+                value={rating}
+                onChange={(e) => setRating(e.target.value)}
+                className="input-field sm:w-48"
+                aria-label="Filter by rating"
+              >
+                <option value="">All Ratings</option>
+                <option value="5">5 Stars</option>
+                <option value="4">4+ Stars</option>
+                <option value="3">3+ Stars</option>
+                <option value="below3">Below 3 Stars</option>
+              </select>
+            </div>
           </div>
           
           {/* Tabs */}
@@ -103,7 +129,23 @@ const CommunityPage = () => {
                 }`}
                 onClick={() => setActiveTab("popular")}
               >
-                Popular
+                <div className="flex items-center gap-1">
+                  <Star size={16} />
+                  <span>Highest Rated</span>
+                </div>
+              </button>
+              <button
+                className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                  activeTab === "trending"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setActiveTab("trending")}
+              >
+                <div className="flex items-center gap-1">
+                  <TrendingUp size={16} />
+                  <span>Trending</span>
+                </div>
               </button>
               <button
                 className={`px-4 py-2 font-medium text-sm border-b-2 ${
@@ -113,7 +155,10 @@ const CommunityPage = () => {
                 }`}
                 onClick={() => setActiveTab("recent")}
               >
-                Recently Added
+                <div className="flex items-center gap-1">
+                  <Clock size={16} />
+                  <span>Recently Added</span>
+                </div>
               </button>
             </div>
           </div>
@@ -168,6 +213,7 @@ const CommunityPage = () => {
                 onClick={() => {
                   setSearchQuery("");
                   setCategory("");
+                  setRating("");
                 }}
                 className="btn-primary"
               >
