@@ -8,6 +8,7 @@ interface FriendProfile {
   avatar_url: string | null;
   status: 'pending' | 'accepted' | 'rejected';
   is_sender: boolean;
+  id: string; // Added to keep track of the friendship ID
 }
 
 interface UserSearchResult {
@@ -54,14 +55,14 @@ export const sendFriendRequest = async (friendId: string): Promise<boolean> => {
     if (!user.user) throw new Error('Not authenticated');
 
     // Check if friend request already exists
-    const { data: existingRequest } = await supabase
+    const { data: existingRequests, error: checkError } = await supabase
       .from('friends')
       .select('*')
-      .or(`user_id.eq.${user.user.id},friend_id.eq.${user.user.id}`)
-      .or(`user_id.eq.${friendId},friend_id.eq.${friendId}`)
-      .single();
+      .or(`and(user_id.eq.${user.user.id},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${user.user.id})`);
 
-    if (existingRequest) {
+    if (checkError) throw checkError;
+    
+    if (existingRequests && existingRequests.length > 0) {
       toast.error('Friend request already exists');
       return false;
     }
@@ -84,7 +85,7 @@ export const sendFriendRequest = async (friendId: string): Promise<boolean> => {
   }
 };
 
-// Accept a friend request
+// Accept or reject a friend request
 export const respondToFriendRequest = async (
   friendshipId: string, 
   status: 'accepted' | 'rejected'
