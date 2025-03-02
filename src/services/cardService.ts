@@ -1,8 +1,9 @@
 
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { Card } from '../types';
 
-export const getCardsByDeckId = async (deckId: string) => {
+export const getCardsByDeckId = async (deckId: string): Promise<Card[]> => {
   try {
     const { data, error } = await supabase
       .from('cards')
@@ -18,7 +19,7 @@ export const getCardsByDeckId = async (deckId: string) => {
   }
 };
 
-export const createCard = async (card: any) => {
+export const createCard = async (card: Partial<Card>) => {
   try {
     const { data, error } = await supabase
       .from('cards')
@@ -35,7 +36,7 @@ export const createCard = async (card: any) => {
   }
 };
 
-export const createCards = async (cards: any[]) => {
+export const createCards = async (cards: Partial<Card>[]) => {
   try {
     const { data, error } = await supabase
       .from('cards')
@@ -51,7 +52,7 @@ export const createCards = async (cards: any[]) => {
   }
 };
 
-export const updateCard = async (id: string, updates: any) => {
+export const updateCard = async (id: string, updates: Partial<Card>) => {
   try {
     const { data, error } = await supabase
       .from('cards')
@@ -88,17 +89,55 @@ export const deleteCard = async (id: string) => {
 export const updateCardReviewStatus = async (id: string, status: 'correct' | 'incorrect' | 'hard') => {
   try {
     const now = new Date().toISOString();
+    const updates: Record<string, any> = {
+      last_reviewed: now
+    };
+    
+    // Increment review count
+    const { data: card, error: fetchError } = await supabase
+      .from('cards')
+      .select('review_count')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    updates.review_count = (card.review_count || 0) + 1;
+    
     const { data, error } = await supabase
       .from('cards')
-      .update({
-        last_reviewed: now,
-        review_count: supabase.rpc('increment', { x: 1 }),
-      })
+      .update(updates)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+    
+    // Update local storage for study tracking
+    if (typeof window !== 'undefined') {
+      try {
+        const { data: deckData } = await supabase
+          .from('cards')
+          .select('deck_id')
+          .eq('id', id)
+          .single();
+          
+        if (deckData) {
+          const userId = (await supabase.auth.getUser()).data.user?.id;
+          if (userId) {
+            // Save study timestamp
+            const studyKey = `recent-study-${userId}`;
+            const storedData = localStorage.getItem(studyKey) || '{}';
+            const studyData = JSON.parse(storedData);
+            studyData[deckData.deck_id] = Date.now();
+            localStorage.setItem(studyKey, JSON.stringify(studyData));
+          }
+        }
+      } catch (e) {
+        console.error("Error updating study tracking:", e);
+      }
+    }
+    
     return data;
   } catch (error: any) {
     console.error('Error updating card review status:', error.message);

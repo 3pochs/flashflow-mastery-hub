@@ -1,8 +1,9 @@
 
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { DeckStat, Deck } from '../types';
 
-export const getDecks = async (userId?: string) => {
+export const getDecks = async (userId?: string): Promise<DeckStat[]> => {
   try {
     let query = supabase
       .from('deck_stats')
@@ -26,7 +27,7 @@ export const getDecks = async (userId?: string) => {
   }
 };
 
-export const getDeckById = async (deckId: string) => {
+export const getDeckById = async (deckId: string): Promise<Deck & { cards: any[] } | null> => {
   try {
     const { data, error } = await supabase
       .from('decks')
